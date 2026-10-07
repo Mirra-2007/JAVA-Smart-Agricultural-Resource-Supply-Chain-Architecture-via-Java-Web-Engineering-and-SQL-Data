@@ -1,0 +1,1948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIRRA — Metro Marketplace</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        :root {
+            /* Metro UI Palette Configuration */
+            --metro-bg: #f5f6f8;
+            --metro-surface: #ffffff;
+            --metro-crimson: #d11141;
+            --metro-green: #00b159;
+            --metro-cyan: #00aedb;
+            --metro-orange: #f37735;
+            --metro-yellow: #ffc425;
+            --metro-purple: #9b51e0;
+            
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-light: #e2e8f0;
+            --radius-flat: 4px;
+            --radius-md: 8px;
+            --transition: all 0.2s ease;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--metro-bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        .hidden { display: none !important; }
+        
+        /* --- AUTH MATRIX CONTAINER --- */
+        #auth-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .auth-container {
+            background: var(--metro-surface);
+            width: 100%;
+            max-width: 440px;
+            padding: 2.5rem;
+            border-radius: var(--radius-md);
+            border-top: 6px solid var(--metro-cyan);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .auth-brand {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .auth-brand h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .role-selector {
+            display: flex;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: var(--radius-flat);
+            margin-bottom: 1.5rem;
+        }
+        .role-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .role-btn.active {
+            background: var(--metro-cyan);
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-main);
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border-light);
+            background: #ffffff;
+            border-radius: var(--radius-flat);
+            outline: none;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            transition: var(--transition);
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--metro-cyan);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--metro-cyan);
+            color: white;
+            border: none;
+            border-radius: var(--radius-flat);
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: var(--transition);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .submit-btn:hover { filter: brightness(0.95); }
+
+        .auth-switch {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .auth-switch a { color: var(--metro-purple); text-decoration: none; font-weight: 600; }
+
+        /* --- METRO BRANDED HEADER --- */
+        header {
+            background: var(--metro-surface);
+            padding: 1.25rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 3px solid var(--metro-yellow);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .logo {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-main);
+            text-decoration: none;
+        }
+
+        .nav-actions { display: flex; align-items: center; gap: 1.25rem; }
+
+        .mode-toggle-container {
+            display: flex;
+            background: #e2e8f0;
+            padding: 3px;
+            border-radius: var(--radius-flat);
+        }
+        .mode-btn {
+            padding: 6px 16px;
+            border: none;
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: var(--transition);
+            background: transparent;
+            color: var(--text-muted);
+        }
+        .mode-btn.normal.active { background: #ffffff; color: var(--text-main); }
+        .mode-btn.organic.active { background: var(--metro-green); color: #fff; }
+
+        .cart-trigger {
+            position: relative;
+            background: #f1f5f9;
+            border: 1px solid var(--border-light);
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-flat);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+        .cart-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: var(--metro-crimson);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 700;
+            min-width: 18px;
+            height: 18px;
+            padding: 2px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logout-btn {
+            background: transparent;
+            border: 2px solid var(--metro-crimson);
+            padding: 6px 14px;
+            border-radius: var(--radius-flat);
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--metro-crimson);
+            transition: var(--transition);
+        }
+        .logout-btn:hover { background: var(--metro-crimson); color: white; }
+
+        /* --- CONTROL BLOCK & SEARCH UTILITY --- */
+        main {
+            max-width: 1300px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .utility-control-bar {
+            background: var(--metro-surface);
+            padding: 1.25rem;
+            border-radius: var(--radius-md);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+            margin-bottom: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            align-items: center;
+            justify-content: space-between;
+            border-left: 5px solid var(--metro-purple);
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            flex: 1;
+            min-width: 260px;
+            max-width: 400px;
+        }
+        .search-input-wrapper input {
+            width: 100%;
+            padding: 12px 16px 12px 42px;
+            font-size: 0.95rem;
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-flat);
+            outline: none;
+            color: var(--text-main);
+        }
+        .search-input-wrapper input:focus {
+            border-color: var(--metro-purple);
+        }
+        .search-input-wrapper::before {
+            content: "🔍";
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.1rem;
+            opacity: 0.6;
+        }
+
+        /* --- ADVANCED FILTER BAR --- */
+        .filter-options-bar {
+            background: var(--metro-surface);
+            padding: 1rem 1.25rem;
+            border-radius: var(--radius-md);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+            margin-bottom: 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            align-items: center;
+            border-left: 5px solid var(--metro-cyan);
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .filter-group label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-main);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            border: 2px solid var(--border-light);
+            border-radius: var(--radius-flat);
+            background: #ffffff;
+            outline: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .filter-select:focus {
+            border-color: var(--metro-cyan);
+        }
+
+        /* --- DYNAMIC FARMER PROFILE DISPLAY --- */
+        .farmer-profile-banner {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #ffffff;
+            padding: 1.5rem 2rem;
+            border-radius: var(--radius-md);
+            margin-bottom: 2rem;
+            border-left: 6px solid var(--metro-green);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .farmer-profile-details h4 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--metro-yellow);
+            margin-bottom: 4px;
+        }
+        .farmer-profile-details p {
+            font-size: 0.9rem;
+            color: #cbd5e1;
+        }
+
+        .section-title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* --- METRO CARD DESIGN STYLES --- */
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .product-card {
+            background: var(--metro-surface);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            transition: var(--transition);
+            border: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            position: relative;
+        }
+        .product-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            border-color: var(--metro-cyan);
+        }
+
+        .product-card.unavailable {
+            opacity: 0.6;
+            filter: grayscale(0.4);
+            border-color: var(--border-light) !important;
+        }
+        .product-card.unavailable:hover {
+            transform: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        }
+
+        .card-image-holder {
+            height: 120px;
+            background: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3.2rem;
+            position: relative;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .card-badge-organic {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: var(--metro-green);
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: var(--radius-flat);
+            text-transform: uppercase;
+        }
+        .card-body {
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+        
+        .prod-common { 
+            font-size: 1.15rem; 
+            font-weight: 700; 
+            color: var(--text-main); 
+            line-height: 1.3;
+        }
+        .prod-botanical { 
+            font-size: 0.8rem; 
+            color: var(--text-muted); 
+            margin-bottom: 1rem; 
+            font-style: italic;
+        }
+        
+        .farmer-assurance-box {
+            background: #f8fafc;
+            padding: 10px;
+            border-radius: var(--radius-flat);
+            font-size: 0.8rem;
+            margin-bottom: 1.25rem;
+            border-left: 3px solid var(--metro-orange);
+        }
+        .farmer-name { font-weight: 700; color: var(--text-main); }
+        .land-details { color: var(--text-muted); margin-top: 2px; }
+        
+        .card-footer {
+            margin-top: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-light);
+        }
+        .price-tag { font-size: 1.15rem; font-weight: 700; color: var(--metro-crimson); }
+        
+        .add-to-cart-btn {
+            background: var(--metro-orange);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: var(--radius-flat);
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .add-to-cart-btn:hover { filter: brightness(0.9); }
+
+        .sold-out-badge {
+            background: #64748b;
+            color: white;
+            padding: 8px 14px;
+            border-radius: var(--radius-flat);
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-block;
+        }
+        
+        .soon-available-badge {
+            background: var(--metro-purple);
+            color: white;
+            padding: 6px 12px;
+            border-radius: var(--radius-flat);
+            font-weight: 700;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-block;
+        }
+
+        .stepper-container {
+            display: flex;
+            align-items: center;
+            background: #f1f5f9;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-flat);
+            overflow: hidden;
+        }
+        .stepper-btn {
+            background: transparent;
+            border: none;
+            width: 32px;
+            height: 32px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            color: var(--text-main);
+            transition: var(--transition);
+        }
+        .stepper-btn:hover { background: rgba(0,0,0,0.05); }
+        .stepper-val {
+            padding: 0 10px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            min-width: 65px;
+            text-align: center;
+            color: var(--text-main);
+        }
+
+        /* --- CHECKOUT SIDE PANEL --- */
+        #cart-sidebar {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100%;
+            background: var(--metro-surface);
+            box-shadow: -5px 0 25px rgba(0,0,0,0.1);
+            z-index: 1000;
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            border-left: 4px solid var(--metro-orange);
+        }
+        #cart-sidebar.open { right: 0; }
+        .cart-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .cart-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); }
+        
+        .cart-items-wrapper { flex: 1; overflow-y: auto; padding: 1.5rem; }
+        .cart-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .cart-item-title { font-weight: 700; font-size: 0.95rem; color: var(--text-main); }
+        .cart-item-price { font-size: 0.8rem; color: var(--text-muted); }
+        .cart-remove-btn { background: none; border: none; color: var(--metro-crimson); font-weight: bold; cursor: pointer; }
+
+        .cart-footer-panel { padding: 1.5rem; border-top: 1px solid var(--border-light); background: #f8fafc; }
+        .cart-total-row { display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+
+        /* --- FARMER MANAGEMENT LAYOUT --- */
+        .admin-grid { display: grid; grid-template-columns: 1fr 1.8fr; gap: 2rem; align-items: start; }
+        .admin-card { background: var(--metro-surface); padding: 2rem; border-radius: var(--radius-md); border: 1px solid var(--border-light); box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        
+        .admin-table-container { background: #ffffff; border-radius: var(--radius-flat); border: 1px solid var(--border-light); overflow: hidden; }
+        .admin-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .admin-table th, .admin-table td { padding: 14px 16px; text-align: left; }
+        .admin-table th { background: #f1f5f9; color: var(--text-main); font-weight: 700; border-bottom: 2px solid var(--border-light); }
+        .admin-table td { border-bottom: 1px solid var(--border-light); }
+        
+        .status-pill-group {
+            display: inline-flex;
+            background: #e2e8f0;
+            padding: 2px;
+            border-radius: var(--radius-flat);
+            gap: 2px;
+        }
+        .status-pill-btn {
+            padding: 4px 8px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+        .status-pill-btn.btn-available.active { background: var(--metro-green); color: #fff; }
+        .status-pill-btn.btn-unavailable.active { background: var(--metro-crimson); color: #fff; }
+        .status-pill-btn.btn-soon.active { background: var(--metro-purple); color: #fff; }
+
+        .edit-price-btn {
+            background: transparent;
+            color: var(--metro-cyan);
+            border: 1px solid var(--metro-cyan);
+            padding: 4px 10px;
+            border-radius: var(--radius-flat);
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--text-main);
+            color: white;
+            padding: 12px 24px;
+            border-radius: var(--radius-flat);
+            z-index: 100000;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+
+        /* --- ACCESS FARM MAP PANEL --- */
+        .farm-map-trigger-card {
+            background: var(--metro-surface);
+            padding: 1.5rem 2rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-light);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+            margin-bottom: 2rem;
+            border-left: 6px solid var(--metro-green);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .farm-map-trigger-card h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+        .farm-map-trigger-card p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            max-width: 560px;
+        }
+
+        #farmmap-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20000;
+            padding: 1rem;
+        }
+
+        .farmmap-container {
+            background: var(--metro-surface);
+            width: 100%;
+            max-width: 1000px;
+            padding: 1.5rem;
+            border-radius: var(--radius-md);
+            border-top: 6px solid var(--metro-green);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            max-height: 92vh;
+            overflow-y: auto;
+            animation: slideDown 0.3s ease;
+        }
+
+        .farmmap-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+        .farmmap-header h3 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: var(--text-main);
+        }
+        .farmmap-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        .farmmap-close-x {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            line-height: 1;
+        }
+
+        .farmmap-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem 1.5rem;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8fafc;
+            border-left: 5px solid var(--metro-cyan);
+            padding: 0.75rem 1rem;
+            border-radius: var(--radius-flat);
+            margin-bottom: 1rem;
+        }
+        .farmmap-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1.25rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+        .farmmap-meta b {
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.5px;
+        }
+
+        .farmmap-status {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+        .farmmap-status.loading {
+            color: var(--text-muted);
+        }
+        .farmmap-status.error {
+            background: #fef2f2;
+            border-left: 4px solid var(--metro-crimson);
+            color: var(--text-main);
+            padding: 12px 14px;
+            border-radius: var(--radius-flat);
+            font-weight: 500;
+        }
+        .farmmap-retry-btn {
+            background: transparent;
+            color: var(--metro-crimson);
+            border: 1px solid var(--metro-crimson);
+            padding: 5px 12px;
+            border-radius: var(--radius-flat);
+            font-weight: 700;
+            font-size: 0.75rem;
+            cursor: pointer;
+            margin-left: 8px;
+            transition: var(--transition);
+        }
+        .farmmap-retry-btn:hover { background: var(--metro-crimson); color: #fff; }
+
+        .farmmap-map-wrap {
+            position: relative;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-flat);
+            overflow: hidden;
+        }
+        #farmmap-canvas {
+            height: 460px;
+            width: 100%;
+            background: #e2e8f0;
+            z-index: 1;
+        }
+
+        .farmmap-legend {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            z-index: 1000;
+            background: var(--metro-surface);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-flat);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+            padding: 10px 12px;
+        }
+        .farmmap-legend-title {
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+        .farmmap-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+        .farmmap-legend-item:last-child { margin-bottom: 0; }
+        .legend-swatch {
+            width: 16px;
+            height: 12px;
+            border-radius: 3px;
+            flex-shrink: 0;
+            border: 2px solid var(--metro-green);
+            background: rgba(0, 177, 89, 0.2);
+        }
+        .legend-line {
+            width: 18px;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--metro-cyan);
+            flex-shrink: 0;
+        }
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .farmmap-footer {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 1rem;
+        }
+        .farmmap-close-btn {
+            background: transparent;
+            border: 2px solid var(--metro-crimson);
+            padding: 8px 18px;
+            border-radius: var(--radius-flat);
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--metro-crimson);
+            transition: var(--transition);
+        }
+        .farmmap-close-btn:hover { background: var(--metro-crimson); color: white; }
+
+        @media (max-width: 720px) {
+            .farmmap-container { padding: 1rem; }
+            #farmmap-canvas { height: 340px; }
+            .farmmap-legend { bottom: 8px; left: 8px; padding: 8px 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toast-box" class="toast hidden"></div>
+
+    <!-- ENTRY CONTROL MODAL -->
+    <div id="auth-overlay">
+        <div class="auth-container">
+            <div class="auth-brand">
+                <h2>MIRRA</h2>
+                <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">Metro Supply Ledger Access Node</p>
+            </div>
+
+            <div class="role-selector">
+                <button class="role-btn active" id="btn-role-user" onclick="setRole('user')">Consumer Portal</button>
+                <button class="role-btn" id="btn-role-admin" onclick="setRole('admin')">Farmer Node</button>
+            </div>
+
+            <form id="form-signin" onsubmit="handleAuthSubmit(event, 'signin')">
+                <div class="form-group">
+                    <label>Account Email</label>
+                    <input type="email" required placeholder="name@gmail.com">
+                </div>
+                <div class="form-group">
+                    <label>Security Passcode</label>
+                    <input type="password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="submit-btn">Access Node</button>
+                <div class="auth-switch">
+                    New operator? <a href="#" onclick="toggleAuthMode('signup')">Create Register</a>
+                </div>
+            </form>
+
+            <form id="form-signup" class="hidden" onsubmit="handleAuthSubmit(event, 'signup')">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" required placeholder="Alex Mercer">
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" required placeholder="name@gmail.com">
+                </div>
+                <div id="user-extra-fields">
+                    <div class="form-group">
+                        <label>Delivery Point</label>
+                        <input type="text" placeholder="Route 4, Sector G">
+                    </div>
+                </div>
+                <div id="admin-extra-fields" class="hidden">
+                    <div class="form-group">
+                        <label>Deed / Registry ID</label>
+                        <input type="text" placeholder="Plot-409/A, Green Fields">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="submit-btn">Initialize Registry</button>
+                <div class="auth-switch">
+                    Already initialized? <a href="#" onclick="toggleAuthMode('signin')">Access Node</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN CORE NAVIGATION -->
+    <header>
+        <a href="#" class="logo">MIRRA</a>
+        
+        <div class="nav-actions" id="user-nav">
+            <div class="mode-toggle-container">
+                <button class="mode-btn normal active" id="mode-normal" onclick="setMarketplaceMode('normal')">Standard</button>
+                <button class="mode-btn organic" id="mode-organic" onclick="setMarketplaceMode('organic')">Bio-Cert</button>
+            </div>
+            <button class="cart-trigger" onclick="toggleCartSidebar(true)">
+                🛒 <span class="cart-badge" id="cart-counter">0</span>
+            </button>
+            <button class="logout-btn" onclick="logout()">Exit</button>
+        </div>
+
+        <div class="nav-actions hidden" id="admin-nav">
+            <span style="font-weight:700; font-size:0.85rem; color:var(--metro-purple);">⚙️ FARM OPERATION DASHBOARD</span>
+            <button class="logout-btn" onclick="logout()">Exit</button>
+        </div>
+    </header>
+
+    <!-- CONSUMER MATRIX VIEW PORTAL -->
+    <main id="view-user">
+        <div class="utility-control-bar">
+            <div class="section-title">
+                <span>Catalog Inventory Matrix</span>
+                <span style="font-size:0.85rem; font-weight:500; color:var(--text-muted); padding:4px 8px; background:#e2e8f0; border-radius:4px;" id="market-count-lbl">0 items</span>
+            </div>
+            <div class="search-input-wrapper">
+                <input type="text" id="storefront-search" placeholder="Filter by Botanical Title, Common Name, or Location..." oninput="handleSearchFilter()">
+            </div>
+        </div>
+
+        <div class="filter-options-bar">
+            <div class="filter-group">
+                <label for="filter-type">Specimen Type:</label>
+                <select id="filter-type" class="filter-select" onchange="handleFilterChange()">
+                    <option value="all">All Items</option>
+                    <option value="vegetable">Vegetables Only</option>
+                    <option value="fruit">Fruits Only</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="filter-farmer">Agronomist (Farmer):</label>
+                <select id="filter-farmer" class="filter-select" onchange="handleFilterChange()">
+                    <option value="all">All Farmers</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="farmer-display-banner" class="farmer-profile-banner hidden">
+            <div class="farmer-profile-details">
+                <h4 id="farmer-banner-name">Farmer A</h4>
+                <p id="farmer-banner-land">📍 Land Details: Nilgiris Highland Sector 4</p>
+            </div>
+            <div style="font-size: 2rem;">🧑‍🌾</div>
+        </div>
+
+        <div class="product-grid" id="market-products-render"></div>
+    </main>
+
+    <!-- FARM MANAGER PANEL -->
+    <main id="view-admin" class="hidden">
+        <div class="farm-map-trigger-card">
+            <div>
+                <h3>🗺️ Farm Irrigation Map</h3>
+                <p>Inspect your farm boundary, irrigation canals, water sources and canal junctions on an interactive map.</p>
+            </div>
+            <button class="submit-btn" style="background:var(--metro-green); width:auto; padding:12px 24px;" onclick="openFarmMap()">Access Farm Map</button>
+        </div>
+        <div class="admin-grid">
+            <div class="admin-card">
+                <h3 style="margin-bottom:1.5rem; color:var(--text-main); font-size:1.15rem; border-bottom:2px solid var(--border-light); padding-bottom:0.5rem;">Provision Marketplace Asset</h3>
+                <form onsubmit="handleFarmerAddProduct(event)">
+                    <div class="form-group">
+                        <label>Common Specimen Name</label>
+                        <input type="text" id="add-name" required placeholder="e.g., Roma Tomato">
+                    </div>
+                    <div class="form-group">
+                        <label>Botanical Title (Primary Name)</label>
+                        <input type="text" id="add-botanical" required placeholder="e.g., Solanum lycopersicum">
+                    </div>
+                    <div class="form-group">
+                        <label>Specimen Type</label>
+                        <select id="add-type">
+                            <option value="vegetable">Vegetable</option>
+                            <option value="fruit">Fruit</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Base Price Allocation (per 0.5 kg in ₹)</label>
+                        <input type="number" id="add-price" required placeholder="35">
+                    </div>
+                    <div class="form-group">
+                        <label>Typology Domain</label>
+                        <select id="add-organic-status">
+                            <option value="normal">Standard Commercial Produce</option>
+                            <option value="organic">Organic Bio-Cert</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Lead Agronomist Name</label>
+                        <select id="add-farmer">
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Sector Allocation / Notes</label>
+                        <input type="text" id="add-land" required placeholder="Sector 4 West Edge">
+                    </div>
+                    <button type="submit" class="submit-btn" style="background:var(--metro-purple)">Inject Asset To Storefront</button>
+                </form>
+            </div>
+
+            <div>
+                <div class="admin-card">
+                    <h3 style="margin-bottom:0.25rem; font-size:1.15rem;">Active Storefront Availability Ledger</h3>
+                    <p style="color:var(--text-muted); font-size:0.8rem; margin-bottom:1.5rem;">Dynamically control items or edit half-kg matrix indexing tables.</p>
+                    <div class="admin-table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Asset Profile</th>
+                                    <th>Price / 0.5 kg</th>
+                                    <th>Typology</th>
+                                    <th>Storefront Visibility Controls</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-ledger-rows"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- SECURE DISPATCH SIDE PANEL -->
+    <aside id="cart-sidebar">
+        <div class="cart-header">
+            <h3 style="font-size:1.1rem; font-weight:700;">Cart Manifest</h3>
+            <button class="cart-close" onclick="toggleCartSidebar(false)">×</button>
+        </div>
+        <div class="cart-items-wrapper" id="cart-items-container"></div>
+        <div class="cart-footer-panel">
+            <div class="cart-total-row">
+                <span style="color:var(--text-muted); font-weight:500;">Aggregate:</span>
+                <span id="cart-total-amount" style="color:var(--metro-crimson);">₹0.00</span>
+            </div>
+            <div id="cart-initial-action">
+                <button class="submit-btn" style="background:var(--metro-orange);" onclick="proceedToPaymentStage()">Proceed to Transaction Matrix</button>
+            </div>
+            <div id="cart-payment-stage" class="hidden">
+                <p style="font-size:0.75rem; font-weight:700; color:var(--text-main); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">Choose Route Channel:</p>
+                <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                    <button class="add-to-cart-btn" style="text-align:left; padding:12px; background:var(--metro-cyan);" onclick="executeSimulatedTransaction('Instant UPI Bridge')">❖ Unified UPI Gateway</button>
+                    <button class="add-to-cart-btn" style="text-align:left; padding:12px; background:var(--metro-purple);" onclick="executeSimulatedTransaction('Tokenized Credit Layer')">💳 Credit / Debit Network</button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ACCESS FARM MAP PANEL -->
+    <div id="farmmap-overlay" class="hidden">
+        <div class="farmmap-container">
+            <div class="farmmap-header">
+                <div>
+                    <h3>FARM MAP</h3>
+                    <div class="farmmap-subtitle" id="farmmap-subtitle">Loading farm data...</div>
+                </div>
+                <button class="farmmap-close-x" onclick="closeFarmMap()" title="Close Farm Map">×</button>
+            </div>
+
+            <div class="farmmap-controls">
+                <div class="filter-group">
+                    <label for="farmmap-farmer-select">Agronomist (Farmer):</label>
+                    <select id="farmmap-farmer-select" class="filter-select" onchange="handleFarmMapFarmerChange()"></select>
+                </div>
+                <div class="farmmap-meta" id="farmmap-meta"></div>
+            </div>
+
+            <div class="farmmap-status hidden" id="farmmap-status"></div>
+
+            <div class="farmmap-map-wrap">
+                <div id="farmmap-canvas"></div>
+                <div class="farmmap-legend hidden" id="farmmap-legend">
+                    <div class="farmmap-legend-title">Legend</div>
+                    <div class="farmmap-legend-item"><span class="legend-swatch"></span> Farm Boundary</div>
+                    <div class="farmmap-legend-item"><span class="legend-line"></span> Irrigation Canal</div>
+                    <div class="farmmap-legend-item"><span class="legend-dot" style="background:var(--metro-cyan);"></span> Water Source</div>
+                    <div class="farmmap-legend-item"><span class="legend-dot" style="background:var(--metro-purple);"></span> Canal Junction</div>
+                    <div class="farmmap-legend-item"><span class="legend-dot" style="background:var(--metro-orange);"></span> Farm Entrance</div>
+                </div>
+            </div>
+
+            <div class="farmmap-footer">
+                <button class="farmmap-close-btn" onclick="closeFarmMap()">Close Map</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="api.js"></script>
+    <script>
+        let globalRole = 'user';
+        let currentAuthMode = 'signin';
+        let currentMarketMode = 'normal'; 
+        let searchQuery = '';
+        let selectedTypeFilter = 'all';
+        let selectedFarmerFilter = 'all';
+        let cart = [];
+
+        const masterProductsDatabase = [
+            { id: 1, type: "vegetable", name: "Carrot", botanical: "Daucus carota", basePrice: 25, emoji: "🥕", farmer: "Farmer A", land: "Alpine Patch A", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 2, type: "vegetable", name: "Beetroot", botanical: "Beta vulgaris", basePrice: 28, emoji: "🫚", farmer: "Farmer B", land: "Plains Patch B", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 3, type: "vegetable", name: "Okra", botanical: "Abelmoschus esculentus", basePrice: 20, emoji: "🥬", farmer: "Farmer C", land: "Eco-Belt Patch C", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 4, type: "vegetable", name: "Eggplant", botanical: "Solanum melongena", basePrice: 22, emoji: "🍆", farmer: "Farmer D", land: "South Node D", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 5, type: "vegetable", name: "Potato", botanical: "Solanum tuberosum", basePrice: 18, emoji: "🥔", farmer: "Farmer E", land: "Valley Patch E", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 6, type: "vegetable", name: "Tomato", botanical: "Solanum lycopersicum", basePrice: 24, emoji: "🍅", farmer: "Farmer F", land: "Agri Sector F", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 7, type: "vegetable", name: "Onion", botanical: "Allium cepa", basePrice: 19, emoji: "🧅", farmer: "Farmer G", land: "Belt Patch G", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 8, type: "vegetable", name: "Garlic", botanical: "Allium sativum", basePrice: 75, emoji: "🧄", farmer: "Farmer H", land: "Valley Slope H", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 9, type: "vegetable", name: "Ginger", botanical: "Zing05555iber officinale", basePrice: 65, emoji: "🫚", farmer: "Farmer I", land: "Shared Boundary I", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 10, type: "vegetable", name: "Spinach", botanical: "Spinacia oleracea", basePrice: 15, emoji: "🥬", farmer: "Farmer J", land: "Wetland Patch J", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 11, type: "vegetable", name: "Cauliflower", botanical: "Brassica oleracea var. botrytis", basePrice: 35, emoji: "🥦", farmer: "Farmer K", land: "Polyhouse Patch K", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 12, type: "vegetable", name: "Cabbage", botanical: "Brassica oleracea var. capitata", basePrice: 22, emoji: "🥬", farmer: "Farmer K", land: "Polyhouse Patch K", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 13, type: "vegetable", name: "Broccoli", botanical: "Brassica oleracea var. italica", basePrice: 80, emoji: "🥦", farmer: "Farmer L", land: "High Tech Farm L", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 14, type: "vegetable", name: "Green Peas", botanical: "Pisum sativum", basePrice: 40, emoji: "🫛", farmer: "Farmer M", land: "Ridge Patch M", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 15, type: "vegetable", name: "Radish", botanical: "Raphanus sativus", basePrice: 17, emoji: "🥕", farmer: "Farmer N", land: "Fields Patch N", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 16, type: "vegetable", name: "Sweet Potato", botanical: "Ipomoea batatas", basePrice: 26, emoji: "🍠", farmer: "Farmer O", land: "Sand Basin O", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 17, type: "vegetable", name: "Green Bell Pepper", botanical: "Capsicum annuum", basePrice: 38, emoji: "🫑", farmer: "Farmer P", land: "Hydro Node P", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 18, type: "vegetable", name: "Yellow Bell Pepper", botanical: "Capsicum annuum", basePrice: 70, emoji: "🫑", farmer: "Farmer P", land: "Environment Block P", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 19, type: "vegetable", name: "Red Bell Pepper", botanical: "Capsicum annuum", basePrice: 70, emoji: "🫑", farmer: "Farmer P", land: "Environment Block P", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 20, type: "vegetable", name: "Bitter Gourd", botanical: "Momordica charantia", basePrice: 24, emoji: "🥒", farmer: "Farmer Q", land: "Riverbed Block Q", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 21, type: "vegetable", name: "Bottle Gourd", botanical: "Lagenaria siceraria", basePrice: 18, emoji: "🥒", farmer: "Farmer R", land: "Basin Patch R", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 22, type: "vegetable", name: "Ridge Gourd", botanical: "Luffa acutangula", basePrice: 22, emoji: "🥒", farmer: "Farmer R", land: "Basin Patch R", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 23, type: "vegetable", name: "Snake Gourd", botanical: "Trichosanthes cucumerina", basePrice: 21, emoji: "🥒", farmer: "Farmer S", land: "Orchard Patch S", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 24, type: "vegetable", name: "Pumpkin", botanical: "Cucurbita moschata", basePrice: 16, emoji: "🎃", farmer: "Farmer T", land: "West Plains T", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 25, type: "vegetable", name: "Ash Gourd", botanical: "Benincasa hispida", basePrice: 19, emoji: "🍈", farmer: "Farmer T", land: "Plain Node T", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 26, type: "vegetable", name: "Cucumber", botanical: "Cucumis sativus", basePrice: 20, emoji: "🥒", farmer: "Farmer U", land: "Green Belt U", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 27, type: "vegetable", name: "Ivy Gourd", botanical: "Coccinia grandis", basePrice: 25, emoji: "🥒", farmer: "Farmer V", land: "Agro Node V", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 28, type: "vegetable", name: "Moringa Drumstick", botanical: "Moringa oleifera", basePrice: 45, emoji: "🫛", farmer: "Farmer W", land: "Semi-Arid Zone W", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 29, type: "vegetable", name: "Elephant Foot Yam", botanical: "Amorphophallus paeoniifolius", basePrice: 32, emoji: "🍠", farmer: "Farmer X", land: "Regenerative Sector X", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 30, type: "vegetable", name: "Taro Root", botanical: "Colocasia esculenta", basePrice: 30, emoji: "🍠", farmer: "Farmer X", land: "Valley Edge X", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 31, type: "vegetable", name: "Green Chilli", botanical: "Capsicum frutescens", basePrice: 26, emoji: "🌶️", farmer: "Farmer Y", land: "Drylands Patch Y", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 32, type: "vegetable", name: "Lemon", botanical: "Citrus limon", basePrice: 40, emoji: "🍋", farmer: "Farmer Z", land: "Orchards Patch Z", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 33, type: "vegetable", name: "Coriander Leaves", botanical: "Coriandrum sativum", basePrice: 15, emoji: "🌿", farmer: "Farmer A", land: "Outskirts Patch A", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 34, type: "vegetable", name: "Mint Leaves", botanical: "Mentha spicata", basePrice: 14, emoji: "🌿", farmer: "Farmer A", land: "Outskirts Patch A", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 35, type: "vegetable", name: "Curry Leaves", botanical: "Murraya koenigii", basePrice: 12, emoji: "🌿", farmer: "Farmer B", land: "Dry Basin B", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 36, type: "vegetable", name: "Spring Onion", botanical: "Allium fistulosum", basePrice: 28, emoji: "🥬", farmer: "Farmer C", land: "High Slopes C", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 37, type: "vegetable", name: "Button Mushroom", botanical: "Agaricus bisporus", basePrice: 55, emoji: "🍄", farmer: "Farmer D", land: "Dark Compound D", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 38, type: "vegetable", name: "Baby Corn", botanical: "Zea mays", basePrice: 42, emoji: "🌽", farmer: "Farmer E", land: "Fields Patch E", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 39, type: "vegetable", name: "Sweet Corn", botanical: "Zea mays convar. saccharata", basePrice: 30, emoji: "🌽", farmer: "Farmer E", land: "Matrix Block E", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 40, type: "vegetable", name: "Green Zucchini", botanical: "Cucurbita pepo", basePrice: 48, emoji: "🥒", farmer: "Farmer F", land: "Tech Roof F", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 41, type: "vegetable", name: "Yellow Zucchini", botanical: "Cucurbita pepo", basePrice: 52, emoji: "🥒", farmer: "Farmer F", land: "Tech Roof F", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 42, type: "vegetable", name: "Iceberg Lettuce", botanical: "Lactuca sativa", basePrice: 60, emoji: "🥬", farmer: "Farmer G", land: "Greenhouse Patch G", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 43, type: "vegetable", name: "Asparagus", botanical: "Asparagus officinalis", basePrice: 140, emoji: "🌿", farmer: "Farmer L", land: "Mountain Matrix L", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 44, type: "vegetable", name: "Celery", botanical: "Apium graveolens", basePrice: 45, emoji: "🌿", farmer: "Farmer G", land: "Cold Base G", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 45, type: "vegetable", name: "Turnip", botanical: "Brassica rapa subsp. rapa", basePrice: 29, emoji: "🥕", farmer: "Farmer H", land: "Slopes Patch H", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 46, type: "vegetable", name: "Knol Khol", botanical: "Brassica oleracea var. gongylodes", basePrice: 32, emoji: "🥦", farmer: "Farmer H", land: "Upper Rim H", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 47, type: "vegetable", name: "Raw Banana", botanical: "Musa paradisiaca", basePrice: 15, emoji: "🍌", farmer: "Farmer I", land: "Flood Sector I", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 48, type: "vegetable", name: "Banana Flower", botanical: "Musa paradisiaca flos", basePrice: 25, emoji: "🪻", farmer: "Farmer I", land: "Flood Sector I", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 49, type: "vegetable", name: "Banana Stem", botanical: "Musa paradisiaca caulis", basePrice: 20, emoji: "🪵", farmer: "Farmer J", land: "River Node J", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 50, type: "vegetable", name: "Broad Beans", botanical: "Vicia faba", basePrice: 27, emoji: "🫛", farmer: "Farmer K", land: "Hills North K", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 51, type: "vegetable", name: "Cluster Beans", botanical: "Cyamopsis tetragonoloba", basePrice: 22, emoji: "🫛", farmer: "Farmer K", land: "Base Cluster K", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 52, type: "vegetable", name: "Chayote", botanical: "Sechium edule", basePrice: 24, emoji: "🍐", farmer: "Farmer M", land: "Edge Valley M", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 53, type: "vegetable", name: "Red Spinach", botanical: "Amaranthus cruentus", basePrice: 16, emoji: "🥬", farmer: "Farmer J", land: "Red Patch J", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 105, type: "vegetable", name: "Carrot", botanical: "Daucus carota", basePrice: 24, emoji: "🥕", farmer: "Farmer B", land: "North Slope B", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 106, type: "vegetable", name: "Carrot", botanical: "Daucus carota", basePrice: 26, emoji: "🥕", farmer: "Farmer C", land: "Highlands C", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 107, type: "vegetable", name: "Tomato", botanical: "Solanum lycopersicum", basePrice: 22, emoji: "🍅", farmer: "Farmer A", land: "Silt Basin A", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 108, type: "vegetable", name: "Tomato", botanical: "Solanum lycopersicum", basePrice: 25, emoji: "🍅", farmer: "Farmer B", land: "Warm Fields B", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 109, type: "vegetable", name: "Tomato", botanical: "Solanum lycopersicum", basePrice: 29, emoji: "🍅", farmer: "Farmer C", land: "Organic Ridge C", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 110, type: "vegetable", name: "Potato", botanical: "Solanum tuberosum", basePrice: 17, emoji: "🥔", farmer: "Farmer F", land: "Sandy Loam F", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 111, type: "vegetable", name: "Potato", botanical: "Solanum tuberosum", basePrice: 19, emoji: "🥔", farmer: "Farmer G", land: "Terrace Plot G", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 112, type: "vegetable", name: "Onion", botanical: "Allium cepa", basePrice: 18, emoji: "🧅", farmer: "Farmer H", land: "Red Soil H", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 113, type: "vegetable", name: "Onion", botanical: "Allium cepa", basePrice: 21, emoji: "🧅", farmer: "Farmer I", land: "Alluvial Delta I", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 114, type: "vegetable", name: "Onion", botanical: "Allium cepa", basePrice: 24, emoji: "🧅", farmer: "Farmer J", land: "Highland Field J", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 115, type: "vegetable", name: "Eggplant", botanical: "Solanum melongena", basePrice: 20, emoji: "🍆", farmer: "Farmer A", land: "Southern Plain A", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 116, type: "vegetable", name: "Eggplant", botanical: "Solanum melongena", basePrice: 24, emoji: "🍆", farmer: "Farmer B", land: "Silt Meadow B", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 117, type: "vegetable", name: "Eggplant", botanical: "Solanum melongena", basePrice: 26, emoji: "🍆", farmer: "Farmer C", land: "Sunny Hillside C", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 118, type: "vegetable", name: "Beetroot", botanical: "Beta vulgaris", basePrice: 27, emoji: "🫚", farmer: "Farmer D", land: "Valley Bed D", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 119, type: "vegetable", name: "Beetroot", botanical: "Beta vulgaris", basePrice: 30, emoji: "🫚", farmer: "Farmer E", land: "Cold Ridge E", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 120, type: "vegetable", name: "Okra", botanical: "Abelmoschus esculentus", basePrice: 21, emoji: "🥬", farmer: "Farmer F", land: "Humid Lowland F", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 121, type: "vegetable", name: "Okra", botanical: "Abelmoschus esculentus", basePrice: 23, emoji: "🥬", farmer: "Farmer G", land: "Spring Basin G", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 122, type: "vegetable", name: "Spinach", botanical: "Spinacia oleracea", basePrice: 14, emoji: "🥬", farmer: "Farmer K", land: "Creek Meadow K", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 123, type: "vegetable", name: "Spinach", botanical: "Spinacia oleracea", basePrice: 16, emoji: "🥬", farmer: "Farmer L", land: "Mist Valley L", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 124, type: "vegetable", name: "Garlic", botanical: "Allium sativum", basePrice: 72, emoji: "🧄", farmer: "Farmer M", land: "Dry Slope M", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 125, type: "vegetable", name: "Ginger", botanical: "Zingiber officinale", basePrice: 62, emoji: "🫚", farmer: "Farmer N", land: "Tropical Corner N", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 126, type: "vegetable", name: "Cauliflower", botanical: "Brassica oleracea var. botrytis", basePrice: 32, emoji: "🥦", farmer: "Farmer O", land: "Silt Flat O", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 127, type: "vegetable", name: "Cabbage", botanical: "Brassica oleracea var. capitata", basePrice: 20, emoji: "🥬", farmer: "Farmer O", land: "Silt Flat O", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 128, type: "vegetable", name: "Green Peas", botanical: "Pisum sativum", basePrice: 38, emoji: "🫛", farmer: "Farmer P", land: "High Slope P", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 129, type: "vegetable", name: "Radish", botanical: "Raphanus sativus", basePrice: 16, emoji: "🥕", farmer: "Farmer Q", land: "River Flat Q", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 130, type: "vegetable", name: "Sweet Potato", botanical: "Ipomoea batatas", basePrice: 24, emoji: "🍠", farmer: "Farmer R", land: "Sandy Ridge R", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 131, type: "vegetable", name: "Bitter Gourd", botanical: "Momordica charantia", basePrice: 22, emoji: "🥒", farmer: "Farmer S", land: "Moist Valley S", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 132, type: "vegetable", name: "Bottle Gourd", botanical: "Lagenaria siceraria", basePrice: 17, emoji: "🥒", farmer: "Farmer T", land: "Wet Basin T", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 133, type: "vegetable", name: "Cucumber", botanical: "Cucumis sativus", basePrice: 18, emoji: "🥒", farmer: "Farmer V", land: "Lake Boundary V", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 134, type: "vegetable", name: "Ivy Gourd", botanical: "Coccinia grandis", basePrice: 24, emoji: "🥒", farmer: "Farmer W", land: "Loam Belt W", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 135, type: "vegetable", name: "Moringa Drumstick", botanical: "Moringa oleifera", basePrice: 42, emoji: "🫛", farmer: "Farmer X", land: "Arid Sector X", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 136, type: "vegetable", name: "Lemon", botanical: "Citrus limon", basePrice: 38, emoji: "🍋", farmer: "Farmer Y", land: "Dry Orchard Y", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 137, type: "vegetable", name: "Green Chilli", botanical: "Capsicum frutescens", basePrice: 24, emoji: "🌶️", farmer: "Farmer Z", land: "Sunny Patch Z", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 138, type: "vegetable", name: "Coriander Leaves", botanical: "Coriandrum sativum", basePrice: 13, emoji: "🌿", farmer: "Farmer B", land: "Humid Strip B", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 139, type: "vegetable", name: "Mint Leaves", botanical: "Mentha spicata", basePrice: 12, emoji: "🌿", farmer: "Farmer B", land: "Humid Strip B", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 140, type: "vegetable", name: "Pumpkin", botanical: "Cucurbita moschata", basePrice: 15, emoji: "🎃", farmer: "Farmer D", land: "Clay Sector D", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 141, type: "vegetable", name: "Sweet Corn", botanical: "Zea mays convar. saccharata", basePrice: 28, emoji: "🌽", farmer: "Farmer F", land: "Basin Block F", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 142, type: "vegetable", name: "Green Zucchini", botanical: "Cucurbita pepo", basePrice: 45, emoji: "🥒", farmer: "Farmer H", land: "Roof Patch H", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 143, type: "vegetable", name: "Iceberg Lettuce", botanical: "Lactuca sativa", basePrice: 55, emoji: "🥬", farmer: "Farmer I", land: "Glass House I", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 144, type: "vegetable", name: "Raw Banana", botanical: "Musa paradisiaca", basePrice: 14, emoji: "🍌", farmer: "Farmer J", land: "Silt Slope J", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 145, type: "vegetable", name: "Broad Beans", botanical: "Vicia faba", basePrice: 25, emoji: "🫛", farmer: "Farmer L", land: "North Border L", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 146, type: "vegetable", name: "Chayote", botanical: "Sechium edule", basePrice: 22, emoji: "🍐", farmer: "Farmer N", land: "Low Valley N", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 147, type: "vegetable", name: "Red Spinach", botanical: "Amaranthus cruentus", basePrice: 15, emoji: "🥬", farmer: "Farmer P", land: "Red Soil P", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 148, type: "vegetable", name: "Carrot", botanical: "Daucus carota", basePrice: 23, emoji: "🥕", farmer: "Farmer D", land: "Sandy Flat D", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 149, type: "vegetable", name: "Carrot", botanical: "Daucus carota", basePrice: 27, emoji: "🥕", farmer: "Farmer E", land: "Loam Patch E", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 150, type: "vegetable", name: "Tomato", botanical: "Solanum lycopersicum", basePrice: 23, emoji: "🍅", farmer: "Farmer G", land: "Central Flat G", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 151, type: "vegetable", name: "Tomato", botanical: "Solanum lycopersicum", basePrice: 26, emoji: "🍅", farmer: "Farmer H", land: "Ridge Flat H", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 152, type: "vegetable", name: "Potato", botanical: "Solanum tuberosum", basePrice: 20, emoji: "🥔", farmer: "Farmer J", land: "High Slope J", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 153, type: "vegetable", name: "Potato", botanical: "Solanum tuberosum", basePrice: 16, emoji: "🥔", farmer: "Farmer L", land: "Basin Soil L", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 154, type: "vegetable", name: "Onion", botanical: "Allium cepa", basePrice: 20, emoji: "🧅", farmer: "Farmer L", land: "Silt Land L", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 155, type: "vegetable", name: "Onion", botanical: "Allium cepa", basePrice: 22, emoji: "🧅", farmer: "Farmer N", land: "Plain Field N", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 156, type: "vegetable", name: "Eggplant", botanical: "Solanum melongena", basePrice: 21, emoji: "🍆", farmer: "Farmer P", land: "Southern Field P", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 157, type: "vegetable", name: "Eggplant", botanical: "Solanum melongena", basePrice: 25, emoji: "🍆", farmer: "Farmer R", land: "Meadow Flat R", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 158, type: "vegetable", name: "Okra", botanical: "Abelmoschus esculentus", basePrice: 19, emoji: "🥬", farmer: "Farmer T", land: "East Plain T", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 159, type: "vegetable", name: "Okra", botanical: "Abelmoschus esculentus", basePrice: 22, emoji: "🥬", farmer: "Farmer V", land: "West Meadow V", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 160, type: "vegetable", name: "Spinach", botanical: "Spinacia oleracea", basePrice: 13, emoji: "🥬", farmer: "Farmer Z", land: "Creek Land Z", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 161, type: "vegetable", name: "Spinach", botanical: "Spinacia oleracea", basePrice: 17, emoji: "🥬", farmer: "Farmer A", land: "Valley Land A", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 162, type: "vegetable", name: "Cauliflower", botanical: "Brassica oleracea var. botrytis", basePrice: 33, emoji: "🥦", farmer: "Farmer C", land: "Cool Slopes C", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 163, type: "vegetable", name: "Cabbage", botanical: "Brassica oleracea var. capitata", basePrice: 21, emoji: "🥬", farmer: "Farmer D", land: "Cold Valley D", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 164, type: "vegetable", name: "Green Peas", botanical: "Pisum sativum", basePrice: 39, emoji: "🫛", farmer: "Farmer F", land: "Northern Slope F", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 165, type: "vegetable", name: "Radish", botanical: "Raphanus sativus", basePrice: 15, emoji: "🥕", farmer: "Farmer H", land: "Wetland Flat H", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 166, type: "vegetable", name: "Sweet Potato", botanical: "Ipomoea batatas", basePrice: 25, emoji: "🍠", farmer: "Farmer J", land: "Sandy Field J", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 167, type: "vegetable", name: "Bitter Gourd", botanical: "Momordica charantia", basePrice: 23, emoji: "🥒", farmer: "Farmer L", land: "Moist Block L", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 168, type: "vegetable", name: "Bottle Gourd", botanical: "Lagenaria siceraria", basePrice: 16, emoji: "🥒", farmer: "Farmer N", land: "Wet Field N", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 169, type: "vegetable", name: "Cucumber", botanical: "Cucumis sativus", basePrice: 19, emoji: "🥒", farmer: "Farmer P", land: "Riverbank Flat P", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 170, type: "vegetable", name: "Ivy Gourd", botanical: "Coccinia grandis", basePrice: 23, emoji: "🥒", farmer: "Farmer R", land: "Alluvial Strip R", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 171, type: "vegetable", name: "Moringa Drumstick", botanical: "Moringa oleifera", basePrice: 43, emoji: "🫛", farmer: "Farmer T", land: "Dry Meadow T", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 172, type: "vegetable", name: "Lemon", botanical: "Citrus limon", basePrice: 39, emoji: "🍋", farmer: "Farmer V", land: "Crest Orchard V", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 173, type: "vegetable", name: "Green Chilli", botanical: "Capsicum frutescens", basePrice: 25, emoji: "🌶️", farmer: "Farmer X", land: "Sunny Corner X", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 174, type: "vegetable", name: "Pumpkin", botanical: "Cucurbita moschata", basePrice: 14, emoji: "🎃", farmer: "Farmer Z", land: "Clay Meadow Z", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 54, type: "fruit", name: "Sweet Yellow Mango", botanical: "Mangifera indica", basePrice: 80, emoji: "🥭", farmer: "Farmer L", land: "Mango Groves L", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 55, type: "fruit", name: "Sweet Premium Mango", botanical: "Mangifera indica var. Premium", basePrice: 120, emoji: "🥭", farmer: "Farmer L", land: "Mango Groves L", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 56, type: "fruit", name: "Standard Yellow Mango", botanical: "Mangifera indica var. Standard", basePrice: 95, emoji: "🥭", farmer: "Farmer M", land: "Fruit Belt M", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 57, type: "fruit", name: "Honey Mango", botanical: "Mangifera indica var. Honey", basePrice: 70, emoji: "🥭", farmer: "Farmer M", land: "Valley Patch M", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 58, type: "fruit", name: "Sweet Yellow Banana", botanical: "Musa acuminata", basePrice: 30, emoji: "🍌", farmer: "Farmer N", land: "Banana Fields N", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 59, type: "fruit", name: "Standard Yellow Banana", botanical: "Musa balbisiana", basePrice: 25, emoji: "🍌", farmer: "Farmer N", land: "Delta Rim N", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 60, type: "fruit", name: "Cooking Banana", botanical: "Musa paradisiaca L.", basePrice: 45, emoji: "🍌", farmer: "Farmer O", land: "South Belt O", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 61, type: "fruit", name: "Red Banana", botanical: "Musa acuminata 'Red'", basePrice: 60, emoji: "🍌", farmer: "Farmer O", land: "Riverbed Patch O", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 62, type: "fruit", name: "Hill Banana", botanical: "Musa acuminata var. Hill", basePrice: 85, emoji: "🍌", farmer: "Farmer P", land: "Hills Upper Node P", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 63, type: "fruit", name: "Green Banana", botanical: "Musa Cavendish G9", basePrice: 20, emoji: "🍌", farmer: "Farmer N", land: "Farms Patch N", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 64, type: "fruit", name: "Pink Guava", botanical: "Psidium guajava", basePrice: 35, emoji: "🍐", farmer: "Farmer Q", land: "Orchard Gate Q", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 65, type: "fruit", name: "White Guava", botanical: "Psidium guajava 'L49'", basePrice: 30, emoji: "🍐", farmer: "Farmer Q", land: "Base Patch Q", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 66, type: "fruit", name: "Black Plum", botanical: "Syzygium cumini", basePrice: 90, emoji: "🍇", farmer: "Farmer R", land: "Forest Fringe R", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 67, type: "fruit", name: "Jackfruit", botanical: "Artocarpus heterophyllus", basePrice: 40, emoji: "🍈", farmer: "Farmer S", land: "Jackfruit Matrix S", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 68, type: "fruit", name: "Papaya", botanical: "Carica papaya", basePrice: 28, emoji: "🍈", farmer: "Farmer T", land: "Plains Patch T", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 69, type: "fruit", name: "Pomegranate", botanical: "Punica granatum", basePrice: 110, emoji: "🍎", farmer: "Farmer U", land: "Semi-Arid Plot U", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 70, type: "fruit", name: "Red Pomegranate", botanical: "Punica granatum 'Red'", basePrice: 135, emoji: "🍎", farmer: "Farmer U", land: "Arid Hills U", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 71, type: "fruit", name: "Sapodilla", botanical: "Manilkara zapota", basePrice: 35, emoji: "🫚", farmer: "Farmer V", land: "Orchards Patch V", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 72, type: "fruit", name: "Custard Apple", botanical: "Annona squamosa", basePrice: 50, emoji: "🍏", farmer: "Farmer W", land: "Foothills Patch W", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 73, type: "fruit", name: "Bullocks Heart", botanical: "Annona reticulata", basePrice: 65, emoji: "🍏", farmer: "Farmer W", land: "Rocky Slopes W", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 74, type: "fruit", name: "Wood Apple", botanical: "Limonia acidissima", basePrice: 25, emoji: "🍈", farmer: "Farmer X", land: "Forest Border X", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 75, type: "fruit", name: "Bael Fruit", botanical: "Aegle marmelos", basePrice: 30, emoji: "🍈", farmer: "Farmer X", land: "Temple Buffer X", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 76, type: "fruit", name: "Muskmelon", botanical: "Cucumis melo", basePrice: 25, emoji: "🍈", farmer: "Farmer Y", land: "Riverbeds Patch Y", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 77, type: "fruit", name: "Watermelon", botanical: "Citrullus lanatus", basePrice: 15, emoji: "🍉", farmer: "Farmer Y", land: "Sandy Basin Y", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 78, type: "fruit", name: "Yellow Watermelon", botanical: "Citrullus lanatus 'Yellow'", basePrice: 35, emoji: "🍉", farmer: "Farmer Y", land: "Controlled Zone Y", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 79, type: "fruit", name: "Acid Lime", botanical: "Citrus aurantiifolia", basePrice: 45, emoji: "🍋", farmer: "Farmer Z", land: "Hill Crest Z", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 80, type: "fruit", name: "Sweet Lime", botanical: "Citrus limetta", basePrice: 50, emoji: "🍋", farmer: "Farmer A", land: "Foothills Patch A", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 81, type: "fruit", name: "Gooseberry", botanical: "Phyllanthus emblica", basePrice: 38, emoji: "🟢", farmer: "Farmer B", land: "Dry Orchards B", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 82, type: "fruit", name: "Indian Jujube", botanical: "Ziziphus mauritiana", basePrice: 40, emoji: "🍒", farmer: "Farmer C", land: "Scrublands Patch C", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 83, type: "fruit", name: "Star Gooseberry", botanical: "Phyllanthus acidus", basePrice: 30, emoji: "🟢", farmer: "Farmer C", land: "Backyard Rim C", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 84, type: "fruit", name: "White Jamun", botanical: "Syzygium cumini var. album", basePrice: 110, emoji: "🍇", farmer: "Farmer R", land: "Hilltop Patch R", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 85, type: "fruit", name: "Ice Apple", botanical: "Borassus flabellifer", basePrice: 45, emoji: "🥥", farmer: "Farmer D", land: "Palm Belt D", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 86, type: "fruit", name: "Tender Coconut", botanical: "Cocos nucifera", basePrice: 30, emoji: "🥥", farmer: "Farmer E", land: "Coconut Groves E", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 87, type: "fruit", name: "Tall Coconut", botanical: "Cocos nucifera var. Tall", basePrice: 25, emoji: "🥥", farmer: "Farmer E", land: "Matrix Block E", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 88, type: "fruit", name: "Figs", botanical: "Ficus carica", basePrice: 90, emoji: "🍇", farmer: "Farmer F", land: "Highland Patch F", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 90, type: "fruit", name: "Sherbet Berry", botanical: "Grewia asiatica", basePrice: 85, emoji: "🍒", farmer: "Farmer G", land: "Arid Zone G", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 91, type: "fruit", name: "Singapore Cherry", botanical: "Muntingia calabura", basePrice: 55, emoji: "🍒", farmer: "Farmer G", land: "Local Patch G", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 92, type: "fruit", name: "Soursop", botanical: "Annona muricata", basePrice: 120, emoji: "🍏", farmer: "Farmer H", land: "Border Orchards H", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 93, type: "fruit", name: "Purple Passion Fruit", botanical: "Passiflora edulis", basePrice: 75, emoji: "🍇", farmer: "Farmer I", land: "Shola Matrix I", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 94, type: "fruit", name: "Yellow Passion Fruit", botanical: "Passiflora edulis f. flavicarpa", basePrice: 65, emoji: "🍋", farmer: "Farmer I", land: "Lower Shola I", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 95, type: "fruit", name: "Red Currant", botanical: "Ribes rubrum", basePrice: 150, emoji: "🍒", farmer: "Farmer J", land: "Premium Patch J", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 96, type: "fruit", name: "Avocado", botanical: "Persea americana", basePrice: 80, emoji: "🥑", farmer: "Farmer K", land: "Lower Hills K", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 97, type: "fruit", name: "Plum", botanical: "Prunus domestica", basePrice: 70, emoji: "🍑", farmer: "Farmer L", land: "Orchards Block L", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 98, type: "fruit", name: "Peach", botanical: "Prunus persica", basePrice: 95, emoji: "🍑", farmer: "Farmer L", land: "High Peak L", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 99, type: "fruit", name: "Star Fruit", botanical: "Averrhoa carambola", basePrice: 50, emoji: "⭐", farmer: "Farmer M", land: "Wet Patch M", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 100, type: "fruit", name: "Bilimbi", botanical: "Averrhoa bilimbi", basePrice: 40, emoji: "🟢", farmer: "Farmer M", land: "Valley Node M", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 101, type: "fruit", name: "Barbados Cherry", botanical: "Malpighia emarginata", basePrice: 110, emoji: "🍒", farmer: "Farmer N", land: "Eco Matrix N", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 102, type: "fruit", name: "Mulberry", botanical: "Morus alba", basePrice: 60, emoji: "🍇", farmer: "Farmer O", land: "Sericulture Rim O", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 103, type: "fruit", name: "Rambutan", botanical: "Nephelium lappaceum", basePrice: 130, emoji: "🔴", farmer: "Farmer P", land: "Mist Foothills P", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 104, type: "fruit", name: "Mangosteen", botanical: "Garcinia mangostana", basePrice: 160, emoji: "🟣", farmer: "Farmer P", land: "Cascade Ridge P", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 175, type: "fruit", name: "Sweet Yellow Mango", botanical: "Mangifera indica", basePrice: 78, emoji: "🥭", farmer: "Farmer A", land: "Sunny Orchard A", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 176, type: "fruit", name: "Sweet Yellow Mango", botanical: "Mangifera indica", basePrice: 82, emoji: "🥭", farmer: "Farmer B", land: "Creek Meadow B", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 177, type: "fruit", name: "Sweet Premium Mango", botanical: "Mangifera indica var. Premium", basePrice: 125, emoji: "🥭", farmer: "Farmer C", land: "Premium Slope C", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 178, type: "fruit", name: "Honey Mango", botanical: "Mangifera indica var. Honey", basePrice: 68, emoji: "🥭", farmer: "Farmer A", land: "Warm Valley A", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 179, type: "fruit", name: "Sweet Yellow Banana", botanical: "Musa acuminata", basePrice: 28, emoji: "🍌", farmer: "Farmer D", land: "River Meadow D", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 180, type: "fruit", name: "Sweet Yellow Banana", botanical: "Musa acuminata", basePrice: 32, emoji: "🍌", farmer: "Farmer E", land: "Alluvial Flat E", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 181, type: "fruit", name: "Red Banana", botanical: "Musa acuminata 'Red'", basePrice: 65, emoji: "🍌", farmer: "Farmer F", land: "Clay Valley F", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 182, type: "fruit", name: "Red Banana", botanical: "Musa acuminata 'Red'", basePrice: 58, emoji: "🍌", farmer: "Farmer G", land: "Humid Field G", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 183, type: "fruit", name: "Hill Banana", botanical: "Musa acuminata var. Hill", basePrice: 80, emoji: "🍌", farmer: "Farmer H", land: "Mountain Edge H", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 184, type: "fruit", name: "Pink Guava", botanical: "Psidium guajava", basePrice: 33, emoji: "🍐", farmer: "Farmer I", land: "Orchard Strip I", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 185, type: "fruit", name: "Pink Guava", botanical: "Psidium guajava", basePrice: 36, emoji: "🍐", farmer: "Farmer J", land: "Lake Edge J", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 186, type: "fruit", name: "White Guava", botanical: "Psidium guajava 'L49'", basePrice: 28, emoji: "🍐", farmer: "Farmer K", land: "Valley Flat K", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 187, type: "fruit", name: "Black Plum", botanical: "Syzygium cumini", basePrice: 85, emoji: "🍇", farmer: "Farmer L", land: "Forest Slope L", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 188, type: "fruit", name: "Jackfruit", botanical: "Artocarpus heterophyllus", basePrice: 38, emoji: "🍈", farmer: "Farmer M", land: "Fruit Slope M", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 189, type: "fruit", name: "Jackfruit", botanical: "Artocarpus heterophyllus", basePrice: 42, emoji: "🍈", farmer: "Farmer N", land: "Deep Soil N", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 190, type: "fruit", name: "Papaya", botanical: "Carica papaya", basePrice: 26, emoji: "🍈", farmer: "Farmer O", land: "Warm Flat O", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 191, type: "fruit", name: "Papaya", botanical: "Carica papaya", basePrice: 30, emoji: "🍈", farmer: "Farmer P", land: "Basin Crop P", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 192, type: "fruit", name: "Pomegranate", botanical: "Punica granatum", basePrice: 105, emoji: "🍎", farmer: "Farmer Q", land: "Arid Flat Q", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 193, type: "fruit", name: "Red Pomegranate", botanical: "Punica granatum 'Red'", basePrice: 130, emoji: "🍎", farmer: "Farmer R", land: "Dry Slope R", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 194, type: "fruit", name: "Sapodilla", botanical: "Manilkara zapota", basePrice: 32, emoji: "🫚", farmer: "Farmer S", land: "Central Grove S", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 195, type: "fruit", name: "Sapodilla", botanical: "Manilkara zapota", basePrice: 36, emoji: "🫚", farmer: "Farmer T", land: "Orchard Flat T", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 196, type: "fruit", name: "Custard Apple", botanical: "Annona squamosa", basePrice: 48, emoji: "🍏", farmer: "Farmer U", land: "Hilly Meadow U", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 197, type: "fruit", name: "Watermelon", botanical: "Citrullus lanatus", basePrice: 14, emoji: "🍉", farmer: "Farmer V", land: "Sandy Flat V", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 198, type: "fruit", name: "Watermelon", botanical: "Citrullus lanatus", basePrice: 16, emoji: "🍉", farmer: "Farmer W", land: "River Delta W", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 199, type: "fruit", name: "Yellow Watermelon", botanical: "Citrullus lanatus 'Yellow'", basePrice: 33, emoji: "🍉", farmer: "Farmer X", land: "Controlled Plot X", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 200, type: "fruit", name: "Sweet Lime", botanical: "Citrus limetta", basePrice: 48, emoji: "🍋", farmer: "Farmer Y", land: "Southern Crest Y", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 201, type: "fruit", name: "Gooseberry", botanical: "Phyllanthus emblica", basePrice: 35, emoji: "🟢", farmer: "Farmer Z", land: "Arid Block Z", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 202, type: "fruit", name: "Ice Apple", botanical: "Borassus flabellifer", basePrice: 42, emoji: "🥥", farmer: "Farmer A", land: "Palm Field A", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 203, type: "fruit", name: "Tender Coconut", botanical: "Cocos nucifera", basePrice: 28, emoji: "🥥", farmer: "Farmer B", land: "Cove Strip B", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 204, type: "fruit", name: "Tender Coconut", botanical: "Cocos nucifera", basePrice: 32, emoji: "🥥", farmer: "Farmer C", land: "Moist Plot C", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 205, type: "fruit", name: "Figs", botanical: "Ficus carica", basePrice: 85, emoji: "🍇", farmer: "Farmer D", land: "High Slope D", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 206, type: "fruit", name: "Soursop", botanical: "Annona muricata", basePrice: 115, emoji: "🍏", farmer: "Farmer E", land: "Valley Orchard E", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 207, type: "fruit", name: "Avocado", botanical: "Persea americana", basePrice: 75, emoji: "🥑", farmer: "Farmer F", land: "Mountain Edge F", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 208, type: "fruit", name: "Plum", botanical: "Prunus domestica", basePrice: 65, emoji: "🍑", farmer: "Farmer G", land: "Central Plot G", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 209, type: "fruit", name: "Peach", botanical: "Prunus persica", basePrice: 90, emoji: "🍑", farmer: "Farmer H", land: "Peak Slope H", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 210, type: "fruit", name: "Star Fruit", botanical: "Averrhoa carambola", basePrice: 48, emoji: "⭐", farmer: "Farmer I", land: "Wet Field I", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 211, type: "fruit", name: "Mangosteen", botanical: "Garcinia mangostana", basePrice: 155, emoji: "🟣", farmer: "Farmer J", land: "Ridge Grove J", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 212, type: "fruit", name: "Sweet Yellow Mango", botanical: "Mangifera indica", basePrice: 84, emoji: "🥭", farmer: "Farmer K", land: "Sunny Patch K", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 213, type: "fruit", name: "Sweet Premium Mango", botanical: "Mangifera indica var. Premium", basePrice: 118, emoji: "🥭", farmer: "Farmer K", land: "Sunny Patch K", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 214, type: "fruit", name: "Honey Mango", botanical: "Mangifera indica var. Honey", basePrice: 72, emoji: "🥭", farmer: "Farmer L", land: "Warm Basin L", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 215, type: "fruit", name: "Sweet Yellow Banana", botanical: "Musa acuminata", basePrice: 31, emoji: "🍌", farmer: "Farmer M", land: "Wet Field M", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 216, type: "fruit", name: "Red Banana", botanical: "Musa acuminata 'Red'", basePrice: 62, emoji: "🍌", farmer: "Farmer N", land: "Creek Basin N", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 217, type: "fruit", name: "Hill Banana", botanical: "Musa acuminata var. Hill", basePrice: 82, emoji: "🍌", farmer: "Farmer O", land: "Upper Hill O", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 218, type: "fruit", name: "Pink Guava", botanical: "Psidium guajava", basePrice: 34, emoji: "🍐", farmer: "Farmer P", land: "Orchard Flat P", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 219, type: "fruit", name: "White Guava", botanical: "Psidium guajava 'L49'", basePrice: 31, emoji: "🍐", farmer: "Farmer R", land: "Flat Meadow R", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 220, type: "fruit", name: "Black Plum", botanical: "Syzygium cumini", basePrice: 88, emoji: "🍇", farmer: "Farmer T", land: "Wetland Crest T", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 221, type: "fruit", name: "Jackfruit", botanical: "Artocarpus heterophyllus", basePrice: 41, emoji: "🍈", farmer: "Farmer V", land: "Alluvial Plain V", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 222, type: "fruit", name: "Papaya", botanical: "Carica papaya", basePrice: 29, emoji: "🍈", farmer: "Farmer X", land: "Plain Plot X", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 223, type: "fruit", name: "Pomegranate", botanical: "Punica granatum", basePrice: 108, emoji: "🍎", farmer: "Farmer Z", land: "Arid Crest Z", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 224, type: "fruit", name: "Sapodilla", botanical: "Manilkara zapota", basePrice: 34, emoji: "🫚", farmer: "Farmer B", land: "Dry Ridge B", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 225, type: "fruit", name: "Custard Apple", botanical: "Annona squamosa", basePrice: 49, emoji: "🍏", farmer: "Farmer D", land: "Slanted Orchard D", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 226, type: "fruit", name: "Watermelon", botanical: "Citrullus lanatus", basePrice: 15, emoji: "🍉", farmer: "Farmer F", land: "River Flat F", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 227, type: "fruit", name: "Sweet Lime", botanical: "Citrus limetta", basePrice: 49, emoji: "🍋", farmer: "Farmer H", land: "Foothills Slope H", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 228, type: "fruit", name: "Gooseberry", botanical: "Phyllanthus emblica", basePrice: 36, emoji: "🟢", farmer: "Farmer J", land: "Dry Plain J", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 229, type: "fruit", name: "Ice Apple", botanical: "Borassus flabellifer", basePrice: 43, emoji: "🥥", farmer: "Farmer L", land: "Sandy Belt L", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 230, type: "fruit", name: "Tender Coconut", botanical: "Cocos nucifera", basePrice: 29, emoji: "🥥", farmer: "Farmer N", land: "Moist Valley N", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 231, type: "fruit", name: "Figs", botanical: "Ficus carica", basePrice: 88, emoji: "🍇", farmer: "Farmer P", land: "Summit Slopes P", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 232, type: "fruit", name: "Soursop", botanical: "Annona muricata", basePrice: 118, emoji: "🍏", farmer: "Farmer R", land: "Lowland Plain R", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 233, type: "fruit", name: "Avocado", botanical: "Persea americana", basePrice: 78, emoji: "🥑", farmer: "Farmer T", land: "Valley Rim T", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 234, type: "fruit", name: "Plum", botanical: "Prunus domestica", basePrice: 68, emoji: "🍑", farmer: "Farmer V", land: "Central Garden V", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 235, type: "fruit", name: "Peach", botanical: "Prunus persica", basePrice: 92, emoji: "🍑", farmer: "Farmer X", land: "Ridge Top X", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 236, type: "fruit", name: "Star Fruit", botanical: "Averrhoa carambola", basePrice: 49, emoji: "⭐", farmer: "Farmer Z", land: "Wet Strip Z", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 237, type: "fruit", name: "Mangosteen", botanical: "Garcinia mangostana", basePrice: 158, emoji: "🟣", farmer: "Farmer B", land: "South Crest B", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 238, type: "fruit", name: "Sweet Yellow Mango", botanical: "Mangifera indica", basePrice: 79, emoji: "🥭", farmer: "Farmer D", land: "Lowland Flat D", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 239, type: "fruit", name: "Sweet Premium Mango", botanical: "Mangifera indica var. Premium", basePrice: 122, emoji: "🥭", farmer: "Farmer F", land: "West Meadow F", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 240, type: "fruit", name: "Honey Mango", botanical: "Mangifera indica var. Honey", basePrice: 69, emoji: "🥭", farmer: "Farmer H", land: "East Basin H", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 241, type: "fruit", name: "Sweet Yellow Banana", botanical: "Musa acuminata", basePrice: 29, emoji: "🍌", farmer: "Farmer J", land: "Moist Block J", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 242, type: "fruit", name: "Red Banana", botanical: "Musa acuminata 'Red'", basePrice: 59, emoji: "🍌", farmer: "Farmer L", land: "Alluvial Sector L", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 243, type: "fruit", name: "Hill Banana", botanical: "Musa acuminata var. Hill", basePrice: 83, emoji: "🍌", farmer: "Farmer N", land: "High Ridge N", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 244, type: "fruit", name: "Pink Guava", botanical: "Psidium guajava", basePrice: 32, emoji: "🍐", farmer: "Farmer Q", land: "South Slopes Q", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 245, type: "fruit", name: "White Guava", botanical: "Psidium guajava 'L49'", basePrice: 29, emoji: "🍐", farmer: "Farmer S", land: "River Sector S", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 246, type: "fruit", name: "Black Plum", botanical: "Syzygium cumini", basePrice: 86, emoji: "🍇", farmer: "Farmer U", land: "Forest Crest U", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 247, type: "fruit", name: "Jackfruit", botanical: "Artocarpus heterophyllus", basePrice: 39, emoji: "🍈", farmer: "Farmer W", land: "Moist Strip W", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 248, type: "fruit", name: "Papaya", botanical: "Carica papaya", basePrice: 27, emoji: "🍈", farmer: "Farmer Y", land: "Warm Crop Y", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 249, type: "fruit", name: "Pomegranate", botanical: "Punica granatum", basePrice: 106, emoji: "🍎", farmer: "Farmer A", land: "Dry Ridge A", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 250, type: "fruit", name: "Sapodilla", botanical: "Manilkara zapota", basePrice: 33, emoji: "🫚", farmer: "Farmer C", land: "Grove Sector C", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 251, type: "fruit", name: "Custard Apple", botanical: "Annona squamosa", basePrice: 47, emoji: "🍏", farmer: "Farmer E", land: "Slope Plot E", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 252, type: "fruit", name: "Watermelon", botanical: "Citrullus lanatus", basePrice: 13, emoji: "🍉", farmer: "Farmer G", land: "Sandy Field G", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 253, type: "fruit", name: "Sweet Lime", botanical: "Citrus limetta", basePrice: 47, emoji: "🍋", farmer: "Farmer I", land: "Central Meadow I", organicOnly: false, available: true, availabilityStatus: "available", availableInWeeks: null },
+            { id: 254, type: "fruit", name: "Gooseberry", botanical: "Phyllanthus emblica", basePrice: 37, emoji: "🟢", farmer: "Farmer K", land: "Low Orchard K", organicOnly: true, available: true, availabilityStatus: "available", availableInWeeks: null }
+        ];
+
+        window.onload = function() {
+            populateFarmerFilters();
+            renderMarketplace();
+            renderAdminLedger();
+        };
+
+        function populateFarmerFilters() {
+            const farmerSelect = document.getElementById('filter-farmer');
+            const adminFarmerSelect = document.getElementById('add-farmer');
+            
+            farmerSelect.innerHTML = '<option value="all">All Farmers</option>';
+            adminFarmerSelect.innerHTML = '';
+
+            const uniqueFarmers = [...new Set(masterProductsDatabase.map(p => p.farmer))].sort((a,b) => {
+                return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+            });
+
+            uniqueFarmers.forEach(farmer => {
+                const opt = document.createElement('option');
+                opt.value = farmer;
+                opt.innerText = farmer;
+                farmerSelect.appendChild(opt);
+
+                const adminOpt = document.createElement('option');
+                adminOpt.value = farmer;
+                adminOpt.innerText = farmer;
+                adminFarmerSelect.appendChild(adminOpt);
+            });
+        }
+
+        function setRole(role) {
+            globalRole = role;
+            document.getElementById('btn-role-user').classList.toggle('active', role === 'user');
+            document.getElementById('btn-role-admin').classList.toggle('active', role === 'admin');
+            document.getElementById('user-extra-fields').classList.toggle('hidden', role === 'admin');
+            document.getElementById('admin-extra-fields').classList.toggle('hidden', role === 'user');
+        }
+
+        function toggleAuthMode(mode) {
+            currentAuthMode = mode;
+            document.getElementById('form-signin').classList.toggle('hidden', mode === 'signup');
+            document.getElementById('form-signup').classList.toggle('hidden', mode === 'signin');
+        }
+
+        function handleAuthSubmit(event, flow) {
+            event.preventDefault();
+            document.getElementById('auth-overlay').classList.add('hidden');
+            
+            const isAdmin = (globalRole === 'admin');
+            document.getElementById('view-user').classList.toggle('hidden', isAdmin);
+            document.getElementById('user-nav').classList.toggle('hidden', isAdmin);
+            document.getElementById('view-admin').classList.toggle('hidden', !isAdmin);
+            document.getElementById('admin-nav').classList.toggle('hidden', !isAdmin);
+            
+            if (isAdmin) renderAdminLedger(); else renderMarketplace();
+        }
+
+        function logout() {
+            document.getElementById('auth-overlay').classList.remove('hidden');
+            cart = [];
+            updateCartUI();
+            toggleCartSidebar(false);
+        }
+
+        function setMarketplaceMode(mode) {
+            currentMarketMode = mode;
+            document.getElementById('mode-normal').classList.toggle('active', mode === 'normal');
+            document.getElementById('mode-organic').classList.toggle('active', mode === 'organic');
+            renderMarketplace();
+        }
+
+        function handleSearchFilter() {
+            searchQuery = document.getElementById('storefront-search').value.toLowerCase().trim();
+            renderMarketplace();
+        }
+
+        function handleFilterChange() {
+            selectedTypeFilter = document.getElementById('filter-type').value;
+            selectedFarmerFilter = document.getElementById('filter-farmer').value;
+            
+            const banner = document.getElementById('farmer-display-banner');
+            
+            if (selectedFarmerFilter !== 'all') {
+                const sampleProd = masterProductsDatabase.find(p => p.farmer === selectedFarmerFilter);
+                if (sampleProd) {
+                    document.getElementById('farmer-banner-name').innerText = selectedFarmerFilter;
+                    document.getElementById('farmer-banner-land').innerText = `📍 Land & Sector Details: ${sampleProd.land}`;
+                    banner.classList.remove('hidden');
+                }
+            } else {
+                banner.classList.add('hidden');
+            }
+            
+            renderMarketplace();
+        }
+
+        function formatWeightDisplay(quantity) {
+            let totalKg = quantity * 0.5;
+            if (totalKg === 0.5) return "1/2 kg";
+            if (Number.isInteger(totalKg)) return `${totalKg} kg`;
+            
+            let floorFl = Math.floor(totalKg);
+            return `${floorFl} 1/2 kg`;
+        }
+
+        function renderMarketplace() {
+            const container = document.getElementById('market-products-render');
+            container.innerHTML = "";
+            const premiumMultiplier = 1.45; 
+
+            masterProductsDatabase.forEach(prod => {
+                const matchesSearch = prod.botanical.toLowerCase().includes(searchQuery) || 
+                                      prod.name.toLowerCase().includes(searchQuery) ||
+                                      prod.land.toLowerCase().includes(searchQuery);
+
+                if (!matchesSearch) return;
+                if (selectedTypeFilter !== 'all' && prod.type !== selectedTypeFilter) return;
+                if (selectedFarmerFilter !== 'all' && prod.farmer !== selectedFarmerFilter) return;
+
+                let currentPrice = prod.basePrice;
+                let displayOrganicBadge = false;
+
+                if (currentMarketMode === 'organic') {
+                    currentPrice = Math.round(prod.basePrice * premiumMultiplier);
+                    displayOrganicBadge = true;
+                } else if (prod.organicOnly) {
+                    return;
+                }
+
+                const activeCartMatch = cart.find(item => item.id === prod.id && item.typology === currentMarketMode);
+                const activeQuantity = activeCartMatch ? activeCartMatch.quantity : 0;
+
+                const card = document.createElement('div');
+                card.className = `product-card ${!prod.available ? 'unavailable' : ''}`;
+                
+                let actionControlHtml = '';
+                if (!prod.available) {
+                    if (prod.availabilityStatus === 'soon') {
+                        actionControlHtml = `<span class="soon-available-badge">Available in ${prod.availableInWeeks} day${prod.availableInWeeks > 1 ? 's' : ''}</span>`;
+                    } else {
+                        actionControlHtml = `<span class="sold-out-badge">Sold Out</span>`;
+                    }
+                } else if (activeQuantity > 0) {
+                    actionControlHtml = `
+                        <div class="stepper-container">
+                            <button class="stepper-btn" onclick="modifyCartQuantity(${prod.id}, '${currentMarketMode}', -1)">-</button>
+                            <span class="stepper-val">${formatWeightDisplay(activeQuantity)}</span>
+                            <button class="stepper-btn" onclick="modifyCartQuantity(${prod.id}, ${currentPrice}, '${currentMarketMode}', 1)">+</button>
+                        </div>
+                    `;
+                } else {
+                    actionControlHtml = `
+                        <button class="add-to-cart-btn" onclick="modifyCartQuantity(${prod.id}, ${currentPrice}, '${currentMarketMode}', 1)">Add to Cart</button>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="card-image-holder">
+                        ${displayOrganicBadge || prod.organicOnly ? `<span class="card-badge-organic">Bio-Cert</span>` : ''}
+                        ${prod.emoji || '🌱'}
+                    </div>
+                    <div class="card-body">
+                        <div class="prod-common">${prod.name}</div>
+                        <div class="prod-botanical">${prod.botanical}</div>
+                        
+                        <div class="farmer-assurance-box">
+                            <div class="farmer-name">🧑‍🌾 ${prod.farmer}</div>
+                            <div class="land-details">📍 ${prod.land}</div>
+                        </div>
+
+                        <div class="card-footer">
+                            <div class="price-tag">₹${currentPrice}<span style="font-size:0.7rem; color:var(--text-muted); font-weight:400;"> / 0.5 kg</span></div>
+                            <div>${actionControlHtml}</div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            
+            document.getElementById('market-count-lbl').innerText = `${container.children.length} items found`;
+        }
+
+        function toggleCartSidebar(open) {
+            document.getElementById('cart-sidebar').classList.toggle('open', open);
+        }
+
+        function modifyCartQuantity(productId, arg2, arg3, arg4) {
+            let itemPrice, modeTypology, direction;
+            
+            if (typeof arg2 === 'string') {
+                modeTypology = arg2;
+                direction = arg3;
+                itemPrice = null;
+            } else {
+                itemPrice = arg2;
+                modeTypology = arg3;
+                direction = arg4;
+            }
+
+            const product = masterProductsDatabase.find(p => p.id === productId);
+            if (!product || !product.available) return;
+
+            const existingItemIndex = cart.findIndex(item => item.id === productId && item.typology === modeTypology);
+
+            if (direction === 1) {
+                if (existingItemIndex > -1) {
+                    cart[existingItemIndex].quantity += 1;
+                } else {
+                    cart.push({ id: product.id, name: product.name, price: itemPrice, typology: modeTypology, quantity: 1 });
+                }
+            } else if (direction === -1 && existingItemIndex > -1) {
+                cart[existingItemIndex].quantity -= 1;
+                if (cart[existingItemIndex].quantity <= 0) {
+                    cart.splice(existingItemIndex, 1);
+                }
+            }
+
+            updateCartUI();
+            renderMarketplace();
+        }
+
+        function removeCartItem(index) {
+            cart.splice(index, 1);
+            updateCartUI();
+            renderMarketplace();
+        }
+
+        function updateCartUI() {
+            const countBadge = document.getElementById('cart-counter');
+            const itemsContainer = document.getElementById('cart-items-container');
+            const totalAmountLabel = document.getElementById('cart-total-amount');
+
+            let totalUnits = 0, netAggregatePrice = 0;
+            itemsContainer.innerHTML = "";
+
+            cart.forEach((item, index) => {
+                totalUnits += item.quantity;
+                let calculationSubtotal = item.price * item.quantity;
+                netAggregatePrice += calculationSubtotal;
+
+                const row = document.createElement('div');
+                row.className = 'cart-item';
+                row.innerHTML = `
+                    <div>
+                        <div class="cart-item-title">${item.name} <span style="font-size:0.7rem; color:var(--metro-purple); font-weight:bold;">${item.typology.toUpperCase()}</span></div>
+                        <div class="cart-item-price">₹${item.price} × ${item.quantity} [${formatWeightDisplay(item.quantity)}]</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span style="font-weight:700; font-size:0.9rem;">₹${calculationSubtotal}</span>
+                        <button class="cart-remove-btn" onclick="removeCartItem(${index})">×</button>
+                    </div>
+                `;
+                itemsContainer.appendChild(row);
+            });
+
+            countBadge.innerText = totalUnits;
+            totalAmountLabel.innerText = `₹${netAggregatePrice}.00`;
+        }
+
+        function proceedToPaymentStage() {
+            if (cart.length === 0) {
+                alert("Cart manifest is currently empty.");
+                return;
+            }
+            document.getElementById('cart-initial-action').classList.add('hidden');
+            document.getElementById('cart-payment-stage').classList.remove('hidden');
+        }
+
+        function executeSimulatedTransaction(gatewayName) {
+            alert(`Transaction successfully authenticated through ${gatewayName}. Dispatch protocols initiated!`);
+            cart = [];
+            updateCartUI();
+            toggleCartSidebar(false);
+            document.getElementById('cart-payment-stage').classList.add('hidden');
+            document.getElementById('cart-initial-action').classList.remove('hidden');
+        }
+
+        function handleFarmerAddProduct(event) {
+            event.preventDefault();
+            const newProd = {
+                id: masterProductsDatabase.length + 1,
+                type: document.getElementById('add-type').value,
+                name: document.getElementById('add-name').value,
+                botanical: document.getElementById('add-botanical').value,
+                basePrice: parseInt(document.getElementById('add-price').value),
+                emoji: document.getElementById('add-type').value === 'fruit' ? '🍎' : '🥕',
+                farmer: document.getElementById('add-farmer').value,
+                land: document.getElementById('add-land').value,
+                organicOnly: document.getElementById('add-organic-status').value === 'organic',
+                available: true,
+                availabilityStatus: "available",
+                availableInWeeks: null
+            };
+            masterProductsDatabase.unshift(newProd);
+            event.target.reset();
+            renderAdminLedger();
+            showToast("Asset successfully injected into the marketplace ledger.");
+        }
+
+        function renderAdminLedger() {
+            const tbody = document.getElementById('admin-ledger-rows');
+            tbody.innerHTML = '';
+            
+            masterProductsDatabase.forEach(prod => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div style="font-weight:700;">${prod.name}</div>
+                        <div style="font-size:0.75rem; color:var(--text-muted);">${prod.botanical} (${prod.farmer})</div>
+                    </td>
+                    <td>₹${prod.basePrice}</td>
+                    <td>${prod.organicOnly ? 'Bio-Cert' : 'Standard'}</td>
+                    <td>
+                        <div class="status-pill-group">
+                            <button class="status-pill-btn btn-available ${prod.available && prod.availabilityStatus === 'available' ? 'active' : ''}" onclick="setProductStatus(${prod.id}, 'available')">Available</button>
+                            <button class="status-pill-btn btn-unavailable ${!prod.available && prod.availabilityStatus === 'unavailable' ? 'active' : ''}" onclick="setProductStatus(${prod.id}, 'unavailable')">Unavailable</button>
+                            <button class="status-pill-btn btn-soon ${!prod.available && prod.availabilityStatus === 'soon' ? 'active' : ''}" onclick="setProductStatus(${prod.id}, 'soon')">Soon</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function setProductStatus(id, status) {
+            const prod = masterProductsDatabase.find(p => p.id === id);
+            if (!prod) return;
+
+            if (status === 'available') {
+                prod.available = true;
+                prod.availabilityStatus = 'available';
+                prod.availableInWeeks = null;
+            } else if (status === 'unavailable') {
+                prod.available = false;
+                prod.availabilityStatus = 'unavailable';
+                prod.availableInWeeks = null;
+            } else if (status === 'soon') {
+                let daysInput = prompt("Enter days (1 to 100):", "7");
+                if (daysInput !== null) {
+                    let days = parseInt(daysInput);
+                    if (!isNaN(days) && days >= 1 && days <= 100) {
+                        prod.available = false;
+                        prod.availabilityStatus = 'soon';
+                        prod.availableInWeeks = days;
+                    } else {
+                        alert("Please enter a valid number between 1 and 100.");
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
+            renderAdminLedger();
+            renderMarketplace();
+            showToast(`Updated status for ${prod.name}`);
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast-box');
+            toast.innerText = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        /* --- ACCESS FARM MAP (Leaflet + Java API via api.js) --- */
+        let farmMapInstance = null;
+        let farmMapShapeLayer = null;
+
+        function openFarmMap() {
+            document.getElementById('farmmap-overlay').classList.remove('hidden');
+            populateFarmMapFarmers();
+            const select = document.getElementById('farmmap-farmer-select');
+            loadFarmMapForFarmer(select.value);
+            setTimeout(() => {
+                if (farmMapInstance) farmMapInstance.invalidateSize();
+            }, 100);
+        }
+
+        function closeFarmMap() {
+            document.getElementById('farmmap-overlay').classList.add('hidden');
+        }
+
+        function populateFarmMapFarmers() {
+            const select = document.getElementById('farmmap-farmer-select');
+            if (select.options.length > 0) return;
+
+            const uniqueFarmers = [...new Set(masterProductsDatabase.map(p => p.farmer))].sort((a, b) => {
+                return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+            });
+
+            uniqueFarmers.forEach(farmer => {
+                const opt = document.createElement('option');
+                opt.value = farmer;
+                opt.innerText = farmer;
+                select.appendChild(opt);
+            });
+        }
+
+        function handleFarmMapFarmerChange() {
+            const select = document.getElementById('farmmap-farmer-select');
+            loadFarmMapForFarmer(select.value);
+        }
+
+        function retryFarmMapLoad() {
+            const select = document.getElementById('farmmap-farmer-select');
+            loadFarmMapForFarmer(select.value);
+        }
+
+        function setFarmMapStatus(state, message) {
+            const statusEl = document.getElementById('farmmap-status');
+            if (state === 'loading') {
+                statusEl.className = 'farmmap-status loading';
+                statusEl.innerText = message;
+            } else if (state === 'error') {
+                statusEl.className = 'farmmap-status error';
+                statusEl.innerHTML = message +
+                    ' <button class="farmmap-retry-btn" onclick="retryFarmMapLoad()">Retry</button>';
+            } else {
+                statusEl.className = 'farmmap-status hidden';
+                statusEl.innerText = '';
+            }
+        }
+
+        async function loadFarmMapForFarmer(farmerName) {
+            const subtitle = document.getElementById('farmmap-subtitle');
+            const meta = document.getElementById('farmmap-meta');
+            const legend = document.getElementById('farmmap-legend');
+
+            subtitle.innerText = farmerName + ' — loading farm map data...';
+            meta.innerHTML = '';
+            legend.classList.add('hidden');
+            setFarmMapStatus('loading', 'Loading farm map data...');
+
+            try {
+                const farmData = await getFarmMap(farmerNameToId(farmerName));
+                renderFarmMap(farmData);
+                setFarmMapStatus('hidden', '');
+
+                subtitle.innerText = farmData.farmerName + ' — ' + farmData.farmId;
+                meta.innerHTML = `
+                    <span><b>Farmer:</b> ${farmData.farmerName}</span>
+                    <span><b>Farm ID:</b> ${farmData.farmId}</span>
+                    <span><b>Area:</b> ${farmData.area} acres</span>
+                    <span><b>Location:</b> ${farmData.location}</span>
+                `;
+                legend.classList.remove('hidden');
+            } catch (error) {
+                const friendly = (error && error.message)
+                    ? error.message
+                    : 'Failed to load farm map data. Please try again.';
+                setFarmMapStatus('error', friendly);
+                subtitle.innerText = farmerName + ' — map data unavailable';
+                meta.innerHTML = '';
+            }
+        }
+
+        function renderFarmMap(data) {
+            const mapDiv = document.getElementById('farmmap-canvas');
+
+            if (!farmMapInstance) {
+                farmMapInstance = L.map(mapDiv);
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(farmMapInstance);
+                farmMapShapeLayer = L.layerGroup().addTo(farmMapInstance);
+            }
+
+            farmMapShapeLayer.clearLayers();
+
+            const boundaryLatLngs = (data.farmBoundary || []).map(p => [p.lat, p.lng]);
+            const polygon = L.polygon(boundaryLatLngs, {
+                color: '#00b159',
+                weight: 3,
+                fillColor: '#00b159',
+                fillOpacity: 0.12
+            }).addTo(farmMapShapeLayer);
+            polygon.bindPopup(farmPopupHtml(data));
+
+            const allPoints = [...boundaryLatLngs];
+
+            (data.canals || []).forEach(canal => {
+                const canalLatLngs = (canal.coordinates || []).map(p => [p.lat, p.lng]);
+                allPoints.push(...canalLatLngs);
+                const line = L.polyline(canalLatLngs, {
+                    color: '#00aedb',
+                    weight: 4,
+                    opacity: 0.9
+                }).addTo(farmMapShapeLayer);
+                line.bindPopup(canalPopupHtml(canal));
+            });
+
+            const markerStyles = {
+                entrance: { color: '#f37735', label: 'Farm Entrance' },
+                waterSource: { color: '#00aedb', label: 'Water Source' },
+                canalStart: { color: '#d11141', label: 'Canal Starting Point' },
+                junction: { color: '#9b51e0', label: 'Canal Junction' }
+            };
+
+            (data.markers || []).forEach(marker => {
+                const style = markerStyles[marker.type] || { color: '#64748b', label: marker.type };
+                const latLng = [marker.lat, marker.lng];
+                allPoints.push(latLng);
+                const dot = L.circleMarker(latLng, {
+                    radius: 7,
+                    color: '#ffffff',
+                    weight: 2,
+                    fillColor: style.color,
+                    fillOpacity: 1
+                }).addTo(farmMapShapeLayer);
+                dot.bindPopup(
+                    `<div style="font-family:'Plus Jakarta Sans',sans-serif; min-width:160px;">
+                        <div style="font-weight:700; font-size:0.9rem; color:#1e293b;">${marker.label}</div>
+                        <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">${style.label}</div>
+                    </div>`
+                );
+            });
+
+            farmMapInstance.invalidateSize();
+            if (allPoints.length > 0) {
+                farmMapInstance.fitBounds(L.latLngBounds(allPoints).pad(0.08));
+            }
+        }
+
+        function farmPopupHtml(data) {
+            return `
+                <div style="font-family:'Plus Jakarta Sans',sans-serif; min-width:190px;">
+                    <div style="font-weight:700; font-size:1rem; color:#00b159; margin-bottom:6px;">${data.farmerName}</div>
+                    <div style="font-size:0.8rem; color:#1e293b; line-height:1.7;">
+                        <div><b style="color:#64748b;">Farm ID:</b> ${data.farmId}</div>
+                        <div><b style="color:#64748b;">Area:</b> ${data.area} acres</div>
+                        <div><b style="color:#64748b;">Location:</b> ${data.location}</div>
+                        <div><b style="color:#64748b;">Canals:</b> ${(data.canals || []).length}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function canalPopupHtml(canal) {
+            const statusColor = canal.waterStatus === 'Active' ? '#00b159'
+                : canal.waterStatus === 'Maintenance' ? '#f37735'
+                : '#d11141';
+            return `
+                <div style="font-family:'Plus Jakarta Sans',sans-serif; min-width:190px;">
+                    <div style="font-weight:700; font-size:0.95rem; color:#1e293b; margin-bottom:6px;">${canal.name}</div>
+                    <div style="font-size:0.8rem; color:#1e293b; line-height:1.7;">
+                        <div><b style="color:#64748b;">ID:</b> ${canal.id}</div>
+                        <div><b style="color:#64748b;">Type:</b> ${canal.type}</div>
+                        <div><b style="color:#64748b;">Length:</b> ${canal.length} km</div>
+                        <div><b style="color:#64748b;">Water Status:</b> <span style="color:${statusColor}; font-weight:700;">${canal.waterStatus}</span></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                const overlay = document.getElementById('farmmap-overlay');
+                if (overlay && !overlay.classList.contains('hidden')) {
+                    closeFarmMap();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
